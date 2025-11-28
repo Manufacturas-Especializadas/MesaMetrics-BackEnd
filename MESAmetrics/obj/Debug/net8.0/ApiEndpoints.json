@@ -1,0 +1,18 @@
+[
+  {
+    "ContainingType": "MESAmetrics.Controllers.TelemetryController",
+    "Method": "Create",
+    "RelativePath": "api/Telemetry/Create",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MESAmetrics.Dtos.TelemetryDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  }
+]
