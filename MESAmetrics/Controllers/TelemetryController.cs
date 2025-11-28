@@ -2,6 +2,7 @@
 using MESAmetrics.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MESAmetrics.Controllers
 {
@@ -14,6 +15,26 @@ namespace MESAmetrics.Controllers
         public TelemetryController(AppDbContext context)
         {
             _context = context;
+        }
+
+        [HttpGet]
+        [Route("GetTelemetry")]
+        public async Task<IActionResult> GetTelemetry()
+        {
+            var telemetry = await _context.Telemetry
+                                    .AsNoTracking()
+                                    .ToListAsync();
+
+            if(telemetry == null)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Sin datos"
+                });
+            }
+
+            return Ok(telemetry);
         }
 
         [HttpPost]
