@@ -58,6 +58,7 @@ namespace MESAmetrics.Controllers
                     StopButton = request.StopButton,
                 };
 
+                _context.Telemetry.Add(newTelemetry);
                 await _context.SaveChangesAsync();
 
                 return Ok(new
