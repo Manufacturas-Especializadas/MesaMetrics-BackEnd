@@ -17,9 +17,10 @@ public partial class AppDbContext : DbContext
     {
         modelBuilder.Entity<Telemetry>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Telemetr__3214EC072238AF25");
+            entity.HasKey(e => e.Id).HasName("PK__Telemetr__3214EC07CBE58B86");
 
             entity.Property(e => e.CycleCount).HasColumnName("cycleCount");
+            entity.Property(e => e.MessageId).HasColumnName("messageId");
             entity.Property(e => e.StopButton).HasColumnName("stopButton");
         });
 

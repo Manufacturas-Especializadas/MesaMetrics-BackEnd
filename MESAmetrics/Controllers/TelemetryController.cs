@@ -56,6 +56,7 @@ namespace MESAmetrics.Controllers
                 {
                     CycleCount = request.CycleCount,
                     StopButton = request.StopButton,
+                    MessageId = request.MessageId,
                 };
 
                 _context.Telemetry.Add(newTelemetry);

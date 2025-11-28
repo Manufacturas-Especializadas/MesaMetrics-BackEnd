@@ -10,4 +10,6 @@ public partial class Telemetry
     public int? CycleCount { get; set; }
 
     public int? StopButton { get; set; }
+
+    public int? MessageId { get; set; }
 }
