@@ -16,6 +16,18 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[RealTime]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Shifts]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Tags]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[Telemetry]",
          "ObjectType": 0
       }
