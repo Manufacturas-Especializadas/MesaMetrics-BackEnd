@@ -7,5 +7,7 @@
         public int? StopButton { get; set; }
 
         public int? MessageId { get; set; }
+
+        public int? MachineId { get; set; }
     }
 }
