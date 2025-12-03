@@ -15,21 +15,21 @@ public partial class RealTime
 
     public TimeOnly? EndTime { get; set; }
 
-    public int? TagsId { get; set; }
-
     public int? Availability { get; set; }
 
-    public TimeOnly? ProductionTime { get; set; }
+    public int? ProductionTime { get; set; }
 
-    public TimeOnly? EvenTime { get; set; }
+    public int? EvenTime { get; set; }
 
     public int? Strikes { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
-    public DateTime? UpdateAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+    public virtual ICollection<RealTimeTags> RealTimeTags { get; set; } = new List<RealTimeTags>();
 
     public virtual Shifts Shift { get; set; }
 
-    public virtual Tags Tags { get; set; }
+    public virtual ICollection<Telemetry> Telemetry { get; set; } = new List<Telemetry>();
 }

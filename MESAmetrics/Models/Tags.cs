@@ -13,5 +13,5 @@ public partial class Tags
 
     public DateTime? UpdatedAt { get; set; }
 
-    public virtual ICollection<RealTime> RealTime { get; set; } = new List<RealTime>();
+    public virtual ICollection<RealTimeTags> RealTimeTags { get; set; } = new List<RealTimeTags>();
 }
