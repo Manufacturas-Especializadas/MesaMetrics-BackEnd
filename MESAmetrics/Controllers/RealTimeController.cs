@@ -23,23 +23,75 @@ namespace MESAmetrics.Controllers
         {
             try
             {
-                if (request == null)
+                if (request == null || string.IsNullOrWhiteSpace(request.Title))
                 {
                     return BadRequest(new RealTimeResponse
                     {
                         Success = false,
-                        Message = "Hay campo incompletos"
+                        Message = "El título de la maquina es requerido"
+                    });
+                }
+
+                if (request.ShiftId <= 0)
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "El turno es requerido"
+                    });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.StartTime) || string.IsNullOrWhiteSpace(request.EndTime))
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Las horas de inicio y fin son requeridas"
+                    });
+                }
+
+                if (request.TagsId == null || !request.TagsId.Any())
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Se requiere al menos una etiqueta"
+                    });
+                }
+
+                if (!TimeOnly.TryParse(request.StartTime, out TimeOnly startTimeParsed))
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Formato de hora de inicio inválido. Use formato HH:mm"
+                    });
+                }
+
+                if (!TimeOnly.TryParse(request.EndTime, out TimeOnly endTimeParsed))
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Formato de hora de fin inválido. Use formato HH:mm"
                     });
                 }
 
                 var newRegister = new RealTime
                 {
-                    Title = request.Title,
+                    Title = request.Title.Trim(),
                     ShiftId = request.ShiftId,
-                    StartTime = request.StartTime,
-                    EndTime = request.EndTime,
-                    TagsId = request.TagsId,
+                    StartTime = startTimeParsed,
+                    EndTime = endTimeParsed,
                 };
+
+                foreach (var tagId in request.TagsId)
+                {
+                    newRegister.RealTimeTags.Add(new RealTimeTags
+                    {
+                        TagId = tagId,
+                    });
+                }
 
                 await _context.RealTime.AddAsync(newRegister);
                 await _context.SaveChangesAsync();
@@ -47,7 +99,7 @@ namespace MESAmetrics.Controllers
                 return Ok(new RealTimeResponse
                 {
                     Success = true,
-                    Message = "Registro guardado"
+                    Message = "Registro guardado exitosamente",
                 });
             }
             catch(Exception ex)
@@ -55,7 +107,7 @@ namespace MESAmetrics.Controllers
                 return StatusCode(500, new RealTimeResponse
                 {
                     Success = false,
-                    Message = $"No se pudo guardar el registro: {ex.Message}"
+                    Message = $"Erorr al guardar el registro: {ex.Message}"
                 });
             }
         }
