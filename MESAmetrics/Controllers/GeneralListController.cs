@@ -1,4 +1,5 @@
-﻿using MESAmetrics.Models;
+﻿using MESAmetrics.Dtos;
+using MESAmetrics.Models;
 using MESAmetrics.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -103,7 +104,7 @@ namespace MESAmetrics.Controllers
                                 .AsNoTracking()
                                 .ToListAsync();
 
-                if(machine == null || machine.Count == 0)
+                if (machine == null || machine.Count == 0)
                 {
                     return BadRequest(new GeneralListsResponse<MachinesIds[]>
                     {
@@ -119,13 +120,54 @@ namespace MESAmetrics.Controllers
                     Data = machine.ToArray()
                 });
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return StatusCode(500, new GeneralListsResponse<MachinesIds[]>
                 {
                     Success = false,
                     Message = $"Error interno: {ex.Message}",
                     Data = Array.Empty<MachinesIds>()
+                });
+            }
+        }
+
+        [HttpGet]
+        [Route("GetLines")]
+        public async Task<IActionResult> GetLines()
+        {
+            try
+            {
+                var lines = await _context.Lines
+                            .Select(l => new LineDto
+                            {
+                                Id = l.Id,
+                                LinesName = l.LinesName
+                            })
+                            .AsNoTracking()
+                            .ToListAsync();
+
+                if (lines == null || lines.Count == 0)
+                {
+                    return BadRequest(new GeneralListsResponse<LineDto[]>
+                    {
+                        Success = false,
+                        Message = "Sin datos"
+                    });
+                }
+
+                return Ok(new GeneralListsResponse<LineDto[]>
+                {
+                    Success = true,
+                    Message = "Datos obtenidos correctamente",
+                    Data = lines.ToArray()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new GeneralListsResponse<LineDto[]>
+                {
+                    Success = false,
+                    Message = $"Error interno: {ex.Message}",
                 });
             }
         }
