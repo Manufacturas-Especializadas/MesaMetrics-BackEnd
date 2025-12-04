@@ -16,6 +16,14 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[Lines]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[MachinesIds]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[RealTime]",
          "ObjectType": 0
       },
