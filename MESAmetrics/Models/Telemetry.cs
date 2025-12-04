@@ -13,13 +13,11 @@ public partial class Telemetry
 
     public int? MessageId { get; set; }
 
-    public int? MachineId { get; set; }
+    public bool? Active { get; set; }
 
     public int? RealTimeId { get; set; }
 
     public DateTime? CreatedAt { get; set; }
-
-    public bool? Active { get; set; }
 
     public virtual RealTime RealTime { get; set; }
 }
