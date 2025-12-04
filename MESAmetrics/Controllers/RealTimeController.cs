@@ -83,6 +83,7 @@ namespace MESAmetrics.Controllers
                     ShiftId = request.ShiftId,
                     StartTime = startTimeParsed,
                     EndTime = endTimeParsed,
+                    LineId = request.LineId,
                 };
 
                 foreach (var tagId in request.TagsId)
