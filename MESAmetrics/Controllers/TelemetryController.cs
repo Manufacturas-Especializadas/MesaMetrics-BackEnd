@@ -77,5 +77,44 @@ namespace MESAmetrics.Controllers
                 });
             }
         }
+
+        [HttpPost]
+        [Route("MachineRegistration")]
+        public async Task<IActionResult> MachineRegistration([FromBody] MachinesIdsDto request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "No puede enviar datos nulos"
+                    });
+                }
+
+                var newMachine = new MachinesIds
+                {
+                    Machine = request.Machine
+                };
+
+                _context.MachinesIds.Add(newMachine);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Registro creado"
+                });
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = $"Error al registrar: ${ex.Message}"
+                });
+            }
+        }
     }
 }
