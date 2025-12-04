@@ -116,5 +116,30 @@ namespace MESAmetrics.Controllers
                 });
             }
         }
+
+        [HttpDelete]
+        [Route("MachineDelete/{id}")]
+        public async Task<IActionResult> MachineDelete(int id)
+        {
+            var machine = await _context.MachinesIds.FindAsync(id);
+
+            if(machine == null)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = "Id no encontrado"
+                });
+            }
+
+            _context.MachinesIds.Remove(machine);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                message = "Id eliminado"
+            });
+        }
     }
 }
