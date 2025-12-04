@@ -93,5 +93,41 @@ namespace MESAmetrics.Controllers
             }
         }
 
+        [HttpGet]
+        [Route("GetMachineIds")]
+        public async Task<IActionResult> GetMachineIds()
+        {
+            try
+            {
+                var machine = await _context.MachinesIds
+                                .AsNoTracking()
+                                .ToListAsync();
+
+                if(machine == null || machine.Count == 0)
+                {
+                    return BadRequest(new GeneralListsResponse<MachinesIds[]>
+                    {
+                        Success = false,
+                        Message = "Sin datos"
+                    });
+                }
+
+                return Ok(new GeneralListsResponse<MachinesIds[]>
+                {
+                    Success = true,
+                    Message = "Datos obtenidos correctamente",
+                    Data = machine.ToArray()
+                });
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, new GeneralListsResponse<MachinesIds[]>
+                {
+                    Success = false,
+                    Message = $"Error interno: {ex.Message}",
+                    Data = Array.Empty<MachinesIds>()
+                });
+            }
+        }
     }
 }

@@ -11,6 +11,10 @@ public partial class RealTime
 
     public int? ShiftId { get; set; }
 
+    public int? LineId { get; set; }
+
+    public int? MachineId { get; set; }
+
     public TimeOnly? StartTime { get; set; }
 
     public TimeOnly? EndTime { get; set; }
@@ -26,6 +30,10 @@ public partial class RealTime
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
+
+    public virtual Lines Line { get; set; }
+
+    public virtual MachinesIds Machine { get; set; }
 
     public virtual ICollection<RealTimeTags> RealTimeTags { get; set; } = new List<RealTimeTags>();
 

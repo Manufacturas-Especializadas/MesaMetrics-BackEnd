@@ -8,6 +8,6 @@
 
         public int? MessageId { get; set; }
 
-        public int? MachineId { get; set; }
+        public bool? Active { get; set; }
     }
 }
