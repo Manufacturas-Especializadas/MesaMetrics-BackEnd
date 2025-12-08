@@ -13,6 +13,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Lines> Lines { get; set; }
 
+    public virtual DbSet<MachineStops> MachineStops { get; set; }
+
     public virtual DbSet<MachinesIds> MachinesIds { get; set; }
 
     public virtual DbSet<RealTime> RealTime { get; set; }
@@ -42,6 +44,27 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasColumnType("datetime")
                 .HasColumnName("updatedAt");
+        });
+
+        modelBuilder.Entity<MachineStops>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__MachineS__3214EC07C872EC9A");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            entity.Property(e => e.DurationMinutes).HasColumnName("durationMinutes");
+            entity.Property(e => e.RealTimeId).HasColumnName("realTimeId");
+            entity.Property(e => e.Reason)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasColumnName("reason");
+            entity.Property(e => e.StopTime).HasColumnName("stopTime");
+
+            entity.HasOne(d => d.RealTime).WithMany(p => p.MachineStops)
+                .HasForeignKey(d => d.RealTimeId)
+                .HasConstraintName("FK__MachineSt__realT__1CBC4616");
         });
 
         modelBuilder.Entity<MachinesIds>(entity =>
