@@ -1,7 +1,10 @@
 ﻿using MESAmetrics.Dtos;
+using MESAmetrics.Hubs;
 using MESAmetrics.Models;
+using MESAmetrics.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace MESAmetrics.Controllers
@@ -11,10 +14,17 @@ namespace MESAmetrics.Controllers
     public class TelemetryController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IHubContext<MachineHub> _hubContext;
+        private readonly IMetricsService _metricsService;
 
-        public TelemetryController(AppDbContext context)
+        public TelemetryController(
+                AppDbContext context,
+                IHubContext<MachineHub> hubContext,
+                IMetricsService metricsService)
         {
             _context = context;
+            _hubContext = hubContext;
+            _metricsService = metricsService;
         }
 
         [HttpGet]
@@ -35,6 +45,38 @@ namespace MESAmetrics.Controllers
             }
 
             return Ok(telemetry);
+        }
+
+        [HttpGet]
+        [Route("CurrentMetrics/{realTimeId}")]
+        public async Task<IActionResult> GetCurrentMetrics(int realTimeId)
+        {
+            var metrics = await _metricsService.CalculateMetricsAsync(realTimeId);
+
+            if (metrics == null)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = "No se encontrarón datos para esta sesión"
+                });
+            }
+
+            return Ok(metrics);
+        }
+
+        [HttpGet]
+        [Route("GetActiveSessions")]
+        public async Task<IActionResult> GetActiveSessions()
+        {
+            var today = DateTime.Today;
+
+            var activeIds = await _context.RealTime              
+                .Where(rt => rt.EndTime == null || rt.CreatedAt!.Value.Date == today)
+                .Select(rt => rt.Id)
+                .ToListAsync();
+
+            return Ok(activeIds);
         }
 
         [HttpPost]
@@ -58,10 +100,23 @@ namespace MESAmetrics.Controllers
                     StopButton = request.StopButton,
                     MessageId = request.MessageId,
                     Active = request.Active,
+                    RealTimeId = request.RealTimeId,
+                    CreatedAt = DateTime.Now
                 };
 
                 _context.Telemetry.Add(newTelemetry);
                 await _context.SaveChangesAsync();
+
+                if (request.RealTimeId.HasValue)
+                {
+                    var metrics = await _metricsService.CalculateMetricsAsync(request.RealTimeId.Value);
+
+                    if(metrics != null)
+                    {
+                        await _hubContext.Clients.Groups(request.RealTimeId.Value.ToString())
+                                .SendAsync("ReceiveMachineMetrics", metrics);
+                    }
+                }
 
                 return Ok(new
                 {
