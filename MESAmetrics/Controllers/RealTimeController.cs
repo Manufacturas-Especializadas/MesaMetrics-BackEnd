@@ -3,6 +3,7 @@ using MESAmetrics.Models;
 using MESAmetrics.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MESAmetrics.Controllers
 {
@@ -109,6 +110,93 @@ namespace MESAmetrics.Controllers
                 {
                     Success = false,
                     Message = $"Erorr al guardar el registro: {ex.Message}"
+                });
+            }
+        }
+
+        [HttpPost]
+        [Route("UpdateRealTime/{id}")]
+        public async Task<IActionResult> UpdateRealTime([FromBody] RealTimeDto request, int id)
+        {
+            try
+            {
+                if(request == null || string.IsNullOrWhiteSpace(request.Title))
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "El titulo de la maquina es requerido"
+                    });
+                }
+
+                if(!TimeOnly.TryParse(request.StartTime, out TimeOnly startTimeParsed) || 
+                    !TimeOnly.TryParse(request.EndTime, out TimeOnly endTimeParsed))
+                {
+                    return BadRequest(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Formato de horas inválido"
+                    });
+                }
+
+                var machine = await _context.RealTime
+                        .Include(x => x.RealTimeTags)
+                        .FirstOrDefaultAsync(x => x.Id == id);
+
+                if(machine == null)
+                {
+                    return NotFound(new RealTimeResponse
+                    {
+                        Success = false,
+                        Message = "Id no encontrado"
+                    });
+                }
+
+                machine.Title = request.Title.Trim();
+                machine.ShiftId = request.ShiftId;
+                machine.StartTime = startTimeParsed;
+                machine.EndTime = endTimeParsed;
+                machine.LineId = request.LineId;
+
+                if(request.TagsId != null)
+                {
+                    var tagsToDelete = machine.RealTimeTags
+                            .Where(t => !request.TagsId.Contains(t.TagId))
+                            .ToList();
+
+                    foreach(var tag in tagsToDelete)
+                    {
+                        machine.RealTimeTags.Remove(tag);
+                    }
+
+                    var existingTagIds = machine.RealTimeTags.Select(t => t.TagId).ToList();
+                    var tagsToAdd = request.TagsId
+                            .Where(newId => !existingTagIds.Contains(newId))
+                            .ToList();
+
+                    foreach(var tagId in tagsToAdd)
+                    {
+                        machine.RealTimeTags.Add(new RealTimeTags
+                        {
+                            TagId = tagId
+                        });
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new RealTimeResponse
+                {
+                    Success = true,
+                    Message = "Registro actualizado"
+                });
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, new RealTimeResponse
+                {
+                    Success = false,
+                    Message = $"Error al actualizar: {ex.Message}"
                 });
             }
         }
