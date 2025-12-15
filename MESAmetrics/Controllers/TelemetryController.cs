@@ -79,6 +79,63 @@ namespace MESAmetrics.Controllers
             return Ok(activeIds);
         }
 
+        [HttpGet]
+        [Route("DashboardStats")]
+        public async Task<IActionResult> GetDashboardStats()
+        {
+            var today = DateTime.Today;
+            var activeIds = await _context.RealTime
+                    .Where(rt => rt.EndTime == null || rt.CreatedAt!.Value.Date == today)
+                    .Select(rt => rt.Id)
+                    .ToListAsync();
+
+            int produciendo = 0;
+            int detenido = 0;
+            int alerta = 0;
+            int sinDatos = 0;
+
+            foreach(var id in activeIds)
+            {
+                var metrics = await _metricsService.CalculateMetricsAsync(id);
+
+                if(metrics != null)
+                {
+                    switch (metrics.Status?.ToLower())
+                    {
+                        case "produccion":
+                            produciendo++;
+                            break;
+
+                        case "detenido":
+                            detenido++; 
+                            break;
+
+                        case "offline":
+                            sinDatos++; 
+                            break;
+
+                        default:
+                            alerta++;
+                            break;
+                    }
+                }
+                else
+                {
+                    sinDatos++;
+                }
+            }
+
+            return Ok(new
+            {
+                Produciendo = produciendo,
+                Detenido = detenido,
+                Alerta = alerta,
+                SinDatos = sinDatos,
+                SinTurno = 0,
+                Total = activeIds.Count
+            });
+        }
+
         [HttpPost]
         [Route("Create")]
         public async Task<IActionResult> Create([FromBody] TelemetryDto request)
@@ -115,6 +172,8 @@ namespace MESAmetrics.Controllers
                     {
                         await _hubContext.Clients.Groups(request.RealTimeId.Value.ToString())
                                 .SendAsync("ReceiveMachineMetrics", metrics);
+
+                        await _hubContext.Clients.All.SendAsync("RefreshDashboard");
                     }
                 }
 
