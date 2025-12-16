@@ -151,6 +151,27 @@ namespace MESAmetrics.Controllers
                     });
                 }
 
+                if(request.RealTimeId == null || request.RealTimeId == 0)
+                {
+                    var activeSession = await _context.RealTime
+                                .Where(rt => rt.EndTime == null)
+                                .OrderByDescending(rt => rt.CreatedAt)
+                                .FirstOrDefaultAsync();
+
+                    if(activeSession != null)
+                    {
+                        request.RealTimeId = activeSession.Id;
+                    }
+                    else
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "No hay sesión activa para recibir datos"
+                        });
+                    }
+                }
+
                 var newTelemetry = new Telemetry
                 {
                     CycleCount = request.CycleCount,
