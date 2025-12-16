@@ -193,7 +193,7 @@ namespace MESAmetrics.Controllers
                         await _hubContext.Clients.Groups(request.RealTimeId.Value.ToString())
                                 .SendAsync("ReceiveMachineMetrics", metrics);
 
-                        await _hubContext.Clients.All.SendAsync("RefreshDashboard");
+                        //await _hubContext.Clients.All.SendAsync("RefreshDashboard");
                     }
                 }
 
