@@ -52,4 +52,4 @@ jobs:
           app-name: 'app-mesa-mesametrics-api-prod'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B6EA638E543841EDA494EBFF61EAF89A }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_942DB70B1A794DE082D1A7D01C348BAF }}
