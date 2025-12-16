@@ -179,7 +179,6 @@ namespace MESAmetrics.Controllers
                     MessageId = request.MessageId,
                     Active = request.Active,
                     RealTimeId = request.RealTimeId,
-                    CreatedAt = DateTime.Now
                 };
 
                 _context.Telemetry.Add(newTelemetry);
