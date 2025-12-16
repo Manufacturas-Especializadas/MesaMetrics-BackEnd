@@ -1,4 +1,6 @@
+using MESAmetrics.Hubs;
 using MESAmetrics.Models;
+using MESAmetrics.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
+
+builder.Services.AddScoped<IMetricsService, MetricsService>();
 
 var connection = builder.Configuration.GetConnectionString("Connection");
 builder.Services.AddDbContext<AppDbContext>(option =>
@@ -20,7 +25,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(allowedConnection)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -36,5 +42,7 @@ app.UseCors("AllowSpecificOrigins");
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<MachineHub>("/machineHub");
 
 app.Run();
