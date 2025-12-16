@@ -35,6 +35,8 @@ public partial class RealTime
 
     public virtual MachinesIds Machine { get; set; }
 
+    public virtual ICollection<MachineStops> MachineStops { get; set; } = new List<MachineStops>();
+
     public virtual ICollection<RealTimeTags> RealTimeTags { get; set; } = new List<RealTimeTags>();
 
     public virtual Shifts Shift { get; set; }

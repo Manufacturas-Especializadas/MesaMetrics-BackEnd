@@ -1,7 +1,10 @@
 ﻿using MESAmetrics.Dtos;
+using MESAmetrics.Hubs;
 using MESAmetrics.Models;
+using MESAmetrics.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace MESAmetrics.Controllers
@@ -11,10 +14,17 @@ namespace MESAmetrics.Controllers
     public class TelemetryController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IHubContext<MachineHub> _hubContext;
+        private readonly IMetricsService _metricsService;
 
-        public TelemetryController(AppDbContext context)
+        public TelemetryController(
+                AppDbContext context,
+                IHubContext<MachineHub> hubContext,
+                IMetricsService metricsService)
         {
             _context = context;
+            _hubContext = hubContext;
+            _metricsService = metricsService;
         }
 
         [HttpGet]
@@ -37,6 +47,95 @@ namespace MESAmetrics.Controllers
             return Ok(telemetry);
         }
 
+        [HttpGet]
+        [Route("CurrentMetrics/{realTimeId}")]
+        public async Task<IActionResult> GetCurrentMetrics(int realTimeId)
+        {
+            var metrics = await _metricsService.CalculateMetricsAsync(realTimeId);
+
+            if (metrics == null)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = "No se encontrarón datos para esta sesión"
+                });
+            }
+
+            return Ok(metrics);
+        }
+
+        [HttpGet]
+        [Route("GetActiveSessions")]
+        public async Task<IActionResult> GetActiveSessions()
+        {
+            var today = DateTime.Today;
+
+            var activeIds = await _context.RealTime              
+                .Where(rt => rt.EndTime == null || rt.CreatedAt!.Value.Date == today)
+                .Select(rt => rt.Id)
+                .ToListAsync();
+
+            return Ok(activeIds);
+        }
+
+        [HttpGet]
+        [Route("DashboardStats")]
+        public async Task<IActionResult> GetDashboardStats()
+        {
+            var today = DateTime.Today;
+            var activeIds = await _context.RealTime
+                    .Where(rt => rt.EndTime == null || rt.CreatedAt!.Value.Date == today)
+                    .Select(rt => rt.Id)
+                    .ToListAsync();
+
+            int produciendo = 0;
+            int detenido = 0;
+            int alerta = 0;
+            int sinDatos = 0;
+
+            foreach(var id in activeIds)
+            {
+                var metrics = await _metricsService.CalculateMetricsAsync(id);
+
+                if(metrics != null)
+                {
+                    switch (metrics.Status?.ToLower())
+                    {
+                        case "produccion":
+                            produciendo++;
+                            break;
+
+                        case "detenido":
+                            detenido++; 
+                            break;
+
+                        case "offline":
+                            sinDatos++; 
+                            break;
+
+                        default:
+                            alerta++;
+                            break;
+                    }
+                }
+                else
+                {
+                    sinDatos++;
+                }
+            }
+
+            return Ok(new
+            {
+                Produciendo = produciendo,
+                Detenido = detenido,
+                Alerta = alerta,
+                SinDatos = sinDatos,
+                SinTurno = 0,
+                Total = activeIds.Count
+            });
+        }
+
         [HttpPost]
         [Route("Create")]
         public async Task<IActionResult> Create([FromBody] TelemetryDto request)
@@ -52,16 +151,52 @@ namespace MESAmetrics.Controllers
                     });
                 }
 
+                if(request.RealTimeId == null || request.RealTimeId == 0)
+                {
+                    var activeSession = await _context.RealTime
+                                .Where(rt => rt.EndTime == null)
+                                .OrderByDescending(rt => rt.CreatedAt)
+                                .FirstOrDefaultAsync();
+
+                    if(activeSession != null)
+                    {
+                        request.RealTimeId = activeSession.Id;
+                    }
+                    else
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "No hay sesión activa para recibir datos"
+                        });
+                    }
+                }
+
                 var newTelemetry = new Telemetry
                 {
                     CycleCount = request.CycleCount,
                     StopButton = request.StopButton,
                     MessageId = request.MessageId,
                     Active = request.Active,
+                    RealTimeId = request.RealTimeId,
+                    CreatedAt = DateTime.Now
                 };
 
                 _context.Telemetry.Add(newTelemetry);
                 await _context.SaveChangesAsync();
+
+                if (request.RealTimeId.HasValue)
+                {
+                    var metrics = await _metricsService.CalculateMetricsAsync(request.RealTimeId.Value);
+
+                    if(metrics != null)
+                    {
+                        await _hubContext.Clients.Groups(request.RealTimeId.Value.ToString())
+                                .SendAsync("ReceiveMachineMetrics", metrics);
+
+                        await _hubContext.Clients.All.SendAsync("RefreshDashboard");
+                    }
+                }
 
                 return Ok(new
                 {

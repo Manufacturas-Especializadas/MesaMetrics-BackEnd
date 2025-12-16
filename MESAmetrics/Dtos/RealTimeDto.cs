@@ -10,6 +10,8 @@
 
         public string? EndTime { get; set; }
 
+        public int? LineId { get; set; }
+
         public List<int>? TagsId { get; set; }
     }
 }
