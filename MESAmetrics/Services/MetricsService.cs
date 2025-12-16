@@ -27,60 +27,98 @@ namespace MESAmetrics.Services
 
             if (session == null) return null!;
 
-            var logs = session.Telemetry.OrderBy(t => t.CreatedAt).ToList();
+            var startOfDay = DateTime.Today;
+            var logs = session.Telemetry
+                .Where(t => t.CreatedAt >= startOfDay)
+                .OrderBy(t => t.CreatedAt)
+                .ToList();
 
             double productionSeconds = 0;
             double stopSeconds = 0;
             int stopCount = 0;
 
+            bool wasProducing = false;
+
             for (int i = 0; i < logs.Count - 1; i++)
             {
                 var current = logs[i];
                 var next = logs[i + 1];
+
                 var duration = (next.CreatedAt!.Value - current.CreatedAt!.Value).TotalSeconds;
 
-                if (current.CycleCount == 1)
+                if (duration > 60)
                 {
-                    productionSeconds += duration;
+                    stopSeconds += duration;
+                    if (wasProducing) { stopCount++; wasProducing = false; }
                 }
                 else
                 {
-                    stopSeconds += duration;
+                    bool isIntervalProducing = next.CycleCount > current.CycleCount;
 
-                    if (i > 0 && logs[i - 1].CycleCount == 1) stopCount++;
+                    if (isIntervalProducing)
+                    {
+                        productionSeconds += duration;
+                        wasProducing = true;
+                    }
+                    else
+                    {
+                        stopSeconds += duration;
+                        if (wasProducing) { stopCount++; wasProducing = false; }
+                    }
                 }
             }
 
             string currentStatus = "offline";
             string statusDurationStr = "0m";
-            double currentSegmentDuration = 0;
 
             if (logs.Any())
             {
                 var lastLog = logs.Last();
                 var now = DateTime.Now;
+
                 var timeSinceLastSignal = (now - lastLog.CreatedAt!.Value).TotalSeconds;
-                
-                bool isProducing = lastLog.CycleCount == 1;
-                currentStatus = isProducing ? "produccion" : "detenido";
 
-                if (isProducing) productionSeconds += timeSinceLastSignal;
-                else stopSeconds += timeSinceLastSignal;
-
-                var lastStateChangeTime = lastLog.CreatedAt!.Value;
-
-                for (int i = logs.Count - 2; i >= 0; i--)
+                if (timeSinceLastSignal > 60)
                 {
-                    bool prevWasProducing = logs[i].CycleCount == 1;
-                    if (prevWasProducing != isProducing)
-                    {
-                        break;
-                    }
-                    lastStateChangeTime = logs[i].CreatedAt!.Value;
-                }
+                    currentStatus = "detenido";
 
-                var durationSpan = now - lastStateChangeTime;
-                statusDurationStr = FormatTime(durationSpan);
+                    stopSeconds += timeSinceLastSignal;
+
+                    statusDurationStr = FormatTime(TimeSpan.FromSeconds(timeSinceLastSignal));
+                }
+                else
+                {
+                    bool isCurrentlyProducing = false;
+
+                    if (logs.Count >= 2)
+                    {
+                        var penultimate = logs[logs.Count - 2];
+                        isCurrentlyProducing = lastLog.CycleCount > penultimate.CycleCount;
+                    }
+
+                    currentStatus = isCurrentlyProducing ? "produccion" : "detenido";
+
+                    if (isCurrentlyProducing)
+                    {
+                        productionSeconds += timeSinceLastSignal;
+                        statusDurationStr = "Produciendo..."; 
+                    }
+                    else
+                    {
+                        stopSeconds += timeSinceLastSignal;
+
+                        var lastStateChangeTime = lastLog.CreatedAt!.Value;
+                        for (int i = logs.Count - 2; i >= 0; i--)
+                        {
+                            if ((logs[i + 1].CycleCount > logs[i].CycleCount) != isCurrentlyProducing)
+                            {
+                                lastStateChangeTime = logs[i + 1].CreatedAt!.Value;
+                                break;
+                            }
+                        }
+                        statusDurationStr = FormatTime(now - lastStateChangeTime);
+                    }
+                }
             }
 
             double totalTime = productionSeconds + stopSeconds;
