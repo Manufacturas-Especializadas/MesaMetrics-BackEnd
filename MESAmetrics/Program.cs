@@ -18,7 +18,10 @@ builder.Services.AddDbContext<AppDbContext>(option =>
     option.UseSqlServer(connection);
 });
 
-var allowedConnection = builder.Configuration.GetValue<string>("OrigenesPermitidos")!.Split(',');
+var allowedConnection = builder.Configuration.GetValue<string>("OrigenesPermitidos")!
+        .Split(',')
+        .Select(origin => origin.Trim())
+        .ToArray();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
