@@ -17,5 +17,7 @@
         public string StopTime { get; set; }
 
         public string Stops { get; set; }
+
+        public List<TimelineSegmentDto> Timeline {  get; set; } = new List<TimelineSegmentDto>();
     }
 }
