@@ -27,9 +27,11 @@ namespace MESAmetrics.Services
 
             if (session == null) return null!;
 
-            var startOfDay = DateTime.Today;
+            var startOfDay = DateTime.Today.AddDays(-1);
+            var endOfDay = DateTime.Today;
+
             var logs = session.Telemetry
-                .Where(t => t.CreatedAt >= startOfDay)
+                .Where(t => t.CreatedAt >= startOfDay && t.CreatedAt < endOfDay)
                 .OrderBy(t => t.CreatedAt)
                 .ToList();
 
@@ -37,104 +39,88 @@ namespace MESAmetrics.Services
             double stopSeconds = 0;
             int stopCount = 0;
 
+            var timeline = new List<TimelineSegmentDto>();
+
+            if (!logs.Any()) return new MachineMetricsDto();
+
+            bool isSegmentProducing = false;
+            if (logs.Count > 1)
+            {
+                var first = logs[0];
+                var second = logs[1];
+                var firstDuration = (second.CreatedAt!.Value - first.CreatedAt!.Value).TotalSeconds;
+                isSegmentProducing = (firstDuration <= 60) && (second.CycleCount > first.CycleCount);
+            }
+
+            var currentSegmentStart = logs[0].CreatedAt!.Value;
             bool wasProducing = false;
 
             for (int i = 0; i < logs.Count - 1; i++)
             {
                 var current = logs[i];
                 var next = logs[i + 1];
+                var duration = Math.Max(0, (next.CreatedAt!.Value - current.CreatedAt!.Value).TotalSeconds);
 
-                var duration = (next.CreatedAt!.Value - current.CreatedAt!.Value).TotalSeconds;
+                bool isGap = duration > 60;
+                bool isIntervalProducing = !isGap && (next.CycleCount > current.CycleCount);
 
-                if (duration > 60)
+                if (isIntervalProducing)
+                {
+                    productionSeconds += duration;
+                    wasProducing = true;
+                }
+                else
                 {
                     stopSeconds += duration;
                     if (wasProducing) { stopCount++; wasProducing = false; }
                 }
-                else
-                {
-                    bool isIntervalProducing = next.CycleCount > current.CycleCount;
 
-                    if (isIntervalProducing)
-                    {
-                        productionSeconds += duration;
-                        wasProducing = true;
-                    }
-                    else
-                    {
-                        stopSeconds += duration;
-                        if (wasProducing) { stopCount++; wasProducing = false; }
-                    }
+                if (isIntervalProducing != isSegmentProducing)
+                {
+                    
+                    AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, current.CreatedAt!.Value);
+
+                    currentSegmentStart = current.CreatedAt!.Value;
+                    isSegmentProducing = isIntervalProducing;
                 }
             }
 
-            string currentStatus = "offline";
-            string statusDurationStr = "0m";
+            var lastLog = logs.Last();
 
-            if (logs.Any())
-            {
-                var lastLog = logs.Last();
-                var now = DateTime.Now;
-
-                var timeSinceLastSignal = (now - lastLog.CreatedAt!.Value).TotalSeconds;
-
-                if (timeSinceLastSignal > 60)
-                {
-                    currentStatus = "detenido";
-
-                    stopSeconds += timeSinceLastSignal;
-
-                    statusDurationStr = FormatTime(TimeSpan.FromSeconds(timeSinceLastSignal));
-                }
-                else
-                {
-                    bool isCurrentlyProducing = false;
-
-                    if (logs.Count >= 2)
-                    {
-                        var penultimate = logs[logs.Count - 2];
-                        isCurrentlyProducing = lastLog.CycleCount > penultimate.CycleCount;
-                    }
-
-                    currentStatus = isCurrentlyProducing ? "produccion" : "detenido";
-
-                    if (isCurrentlyProducing)
-                    {
-                        productionSeconds += timeSinceLastSignal;
-                        statusDurationStr = "Produciendo..."; 
-                    }
-                    else
-                    {
-                        stopSeconds += timeSinceLastSignal;
-
-                        var lastStateChangeTime = lastLog.CreatedAt!.Value;
-                        for (int i = logs.Count - 2; i >= 0; i--)
-                        {
-                            if ((logs[i + 1].CycleCount > logs[i].CycleCount) != isCurrentlyProducing)
-                            {
-                                lastStateChangeTime = logs[i + 1].CreatedAt!.Value;
-                                break;
-                            }
-                        }
-                        statusDurationStr = FormatTime(now - lastStateChangeTime);
-                    }
-                }
-            }
+            AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
 
             double totalTime = productionSeconds + stopSeconds;
             double availability = totalTime > 0 ? (productionSeconds / totalTime) * 100 : 0;
+
+            var lastSeg = timeline.LastOrDefault();
+            string statusDurationStr = lastSeg != null ? lastSeg.Duration : "0m";
 
             return new MachineMetricsDto
             {
                 MachineName = session.Title,
                 Shift = session.Shift?.ShiftName ?? "N/A",
-                Status = currentStatus,
+                Status = isSegmentProducing ? "produccion" : "detenido",
                 StatusDuration = statusDurationStr,
                 Availability = $"{availability:F1}%",
                 ProductionTime = FormatTime(TimeSpan.FromSeconds(productionSeconds)),
                 StopTime = FormatTime(TimeSpan.FromSeconds(stopSeconds)),
-                Stops = stopCount.ToString()
+                Stops = stopCount.ToString(),
+                Timeline = timeline
             };
+        }
+
+        private void AddSegment(List<TimelineSegmentDto> list, string status, DateTime start, DateTime end)
+        {
+            var duration = end - start;
+            if (duration.TotalSeconds < 1) return;
+
+            list.Add(new TimelineSegmentDto
+            {
+                Status = status,
+                StartTime = start,
+                EndTime = end,
+                Duration = FormatTime(duration)
+            });
         }
 
         private string FormatTime(TimeSpan ts)
