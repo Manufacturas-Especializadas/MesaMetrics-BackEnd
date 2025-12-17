@@ -27,11 +27,10 @@ namespace MESAmetrics.Services
 
             if (session == null) return null!;
 
-            var startOfDay = DateTime.Today.AddDays(-1);
-            var endOfDay = DateTime.Today;
+            var startOfDay = DateTime.Today;
 
             var logs = session.Telemetry
-                .Where(t => t.CreatedAt >= startOfDay && t.CreatedAt < endOfDay)
+                .Where(t => t.CreatedAt >= startOfDay)
                 .OrderBy(t => t.CreatedAt)
                 .ToList();
 
@@ -77,17 +76,50 @@ namespace MESAmetrics.Services
 
                 if (isIntervalProducing != isSegmentProducing)
                 {
-                    
                     AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, current.CreatedAt!.Value);
-
                     currentSegmentStart = current.CreatedAt!.Value;
                     isSegmentProducing = isIntervalProducing;
                 }
             }
 
             var lastLog = logs.Last();
+            var now = DateTime.Now;
+            var timeSinceLastSignal = Math.Max(0, (now - lastLog.CreatedAt!.Value).TotalSeconds);
 
-            AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
+            string currentStatus = "detenido";
+            bool isLiveProducing = false;
+
+            if (timeSinceLastSignal > 60)
+            {
+                currentStatus = "detenido";
+                stopSeconds += timeSinceLastSignal;
+                if (wasProducing) stopCount++;
+
+                AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
+
+                AddSegment(timeline, "detenido", lastLog.CreatedAt!.Value, now);
+            }
+            else
+            {
+                if (logs.Count >= 2)
+                {
+                    var penultimate = logs[logs.Count - 2];
+                    isLiveProducing = lastLog.CycleCount > penultimate.CycleCount;
+                }
+
+                currentStatus = isLiveProducing ? "produccion" : "detenido";
+
+                if (isLiveProducing) productionSeconds += timeSinceLastSignal;
+                else stopSeconds += timeSinceLastSignal;
+
+                if (isLiveProducing != isSegmentProducing)
+                {
+                    AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
+                    currentSegmentStart = lastLog.CreatedAt!.Value;
+                }
+
+                AddSegment(timeline, isLiveProducing ? "produccion" : "detenido", currentSegmentStart, now);
+            }
 
             double totalTime = productionSeconds + stopSeconds;
             double availability = totalTime > 0 ? (productionSeconds / totalTime) * 100 : 0;
@@ -99,7 +131,7 @@ namespace MESAmetrics.Services
             {
                 MachineName = session.Title,
                 Shift = session.Shift?.ShiftName ?? "N/A",
-                Status = isSegmentProducing ? "produccion" : "detenido",
+                Status = currentStatus,
                 StatusDuration = statusDurationStr,
                 Availability = $"{availability:F1}%",
                 ProductionTime = FormatTime(TimeSpan.FromSeconds(productionSeconds)),
