@@ -18,6 +18,23 @@ namespace MESAmetrics.Services
             _context = context;
         }
 
+        private DateTime GetMexicoTime()
+        {
+            var utcNow = DateTime.UtcNow;
+            TimeZoneInfo mexicoZone;
+
+            try
+            {
+                mexicoZone = TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                mexicoZone = TimeZoneInfo.FindSystemTimeZoneById("America/Monterrey");
+            }
+
+            return TimeZoneInfo.ConvertTimeFromUtc(utcNow, mexicoZone);
+        }
+
         public async Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId)
         {
             var session = await _context.RealTime
@@ -27,7 +44,7 @@ namespace MESAmetrics.Services
 
             if (session == null) return null!;
 
-            var startOfDay = DateTime.Today;
+            var startOfDay = GetMexicoTime().Date;
 
             var logs = session.Telemetry
                 .Where(t => t.CreatedAt >= startOfDay)
@@ -83,7 +100,9 @@ namespace MESAmetrics.Services
             }
 
             var lastLog = logs.Last();
-            var now = DateTime.Now;
+
+            var now = GetMexicoTime();
+
             var timeSinceLastSignal = Math.Max(0, (now - lastLog.CreatedAt!.Value).TotalSeconds);
 
             string currentStatus = "detenido";
@@ -96,7 +115,6 @@ namespace MESAmetrics.Services
                 if (wasProducing) stopCount++;
 
                 AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
-
                 AddSegment(timeline, "detenido", lastLog.CreatedAt!.Value, now);
             }
             else
