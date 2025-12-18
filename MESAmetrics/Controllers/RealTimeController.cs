@@ -18,6 +18,27 @@ namespace MESAmetrics.Controllers
             _context = context;
         }
 
+        [HttpGet]
+        [Route("GetRealTimeById/{id}")]
+        public async Task<IActionResult> GetRealTimeById(int id)
+        {
+            var realTime = await _context.RealTime
+                .Select(r => new
+                {
+                    Id = r.Id,
+                    Title = r.Title,
+                    Shift = r.Shift.ShiftName,
+                    Line = r.Line.LinesName,
+                    MachineId = r.Machine.Machine,
+                    StartTime = r.StartTime,
+                    EndTime = r.EndTime,
+                    TagsId = r.RealTimeTags.Select(r => r.Id).ToList()
+                })
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            return Ok(realTime);
+        }
+
         [HttpPost]
         [Route("RegisterRealTime")]
         public async Task<IActionResult> RegisterRealTime([FromBody] RealTimeDto request)
@@ -114,7 +135,7 @@ namespace MESAmetrics.Controllers
             }
         }
 
-        [HttpPost]
+        [HttpPut]
         [Route("UpdateRealTime/{id}")]
         public async Task<IActionResult> UpdateRealTime([FromBody] RealTimeDto request, int id)
         {
@@ -157,6 +178,7 @@ namespace MESAmetrics.Controllers
                 machine.StartTime = startTimeParsed;
                 machine.EndTime = endTimeParsed;
                 machine.LineId = request.LineId;
+                machine.UpdatedAt = DateTime.UtcNow;
 
                 if(request.TagsId != null)
                 {
