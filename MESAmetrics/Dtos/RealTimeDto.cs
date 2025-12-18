@@ -12,6 +12,8 @@
 
         public int? LineId { get; set; }
 
+        public int? MachineId { get; set; }
+
         public List<int>? TagsId { get; set; }
     }
 }

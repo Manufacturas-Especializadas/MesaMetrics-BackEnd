@@ -105,6 +105,7 @@ namespace MESAmetrics.Controllers
                     ShiftId = request.ShiftId,
                     StartTime = startTimeParsed,
                     EndTime = endTimeParsed,
+                    MachineId = request.MachineId,
                     LineId = request.LineId,
                 };
 
