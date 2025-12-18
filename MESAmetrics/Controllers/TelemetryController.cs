@@ -136,6 +136,32 @@ namespace MESAmetrics.Controllers
             });
         }
 
+        [HttpGet]
+        [Route("History")]
+        public async Task<IActionResult> GetHistory([FromQuery] DateTime date, [FromQuery] string shift)
+        {
+            try
+            {
+                string dbShiftName = shift.ToLower() == "morining" ? "Mañana" : "Noche";
+
+                var metricsList = await _metricsService.GetHistoricalMetricsAsync(date, dbShiftName);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = metricsList
+                });
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message,
+                });
+            }
+        }
+
         [HttpPost]
         [Route("Create")]
         public async Task<IActionResult> Create([FromBody] TelemetryDto request)

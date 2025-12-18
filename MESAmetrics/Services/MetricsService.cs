@@ -6,7 +6,9 @@ namespace MESAmetrics.Services
 {
     public interface IMetricsService
     {
-        Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId);
+        Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId, DateTime? historicalDate = null);
+
+        Task<List<MachineMetricsDto>> GetHistoricalMetricsAsync(DateTime date, string shift);
     }
 
     public class MetricsService : IMetricsService
@@ -35,19 +37,48 @@ namespace MESAmetrics.Services
             return TimeZoneInfo.ConvertTimeFromUtc(utcNow, mexicoZone);
         }
 
-        public async Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId)
+        public async Task<List<MachineMetricsDto>> GetHistoricalMetricsAsync(DateTime date, string shift)
+        {
+            var targetDate = date.Date;
+
+            var sessions = await _context.RealTime
+                    .Include(rt => rt.Shift)
+                    .Where(rt =>
+                        rt.CreatedAt.Value.Date == targetDate &&
+                        rt.Shift.ShiftName == shift
+                    )
+                    .ToListAsync();
+
+            var result = new List<MachineMetricsDto>();
+
+            foreach(var session in sessions)
+            {
+                var metrics = await CalculateMetricsAsync(session.Id, targetDate);
+                if(metrics != null)
+                {
+                    result.Add(metrics);
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId, DateTime? historicalDate = null)
         {
             var session = await _context.RealTime
-                .Include(rt => rt.Shift)
-                .Include(rt => rt.Telemetry)
-                .FirstOrDefaultAsync(rt => rt.Id == realTimeId);
+               .Include(rt => rt.Shift)
+               .Include(rt => rt.Telemetry)
+               .FirstOrDefaultAsync(rt => rt.Id == realTimeId);
 
             if (session == null) return null!;
 
-            var startOfDay = GetMexicoTime().Date;
+            var referenceDate = historicalDate.HasValue ? historicalDate.Value.Date : GetMexicoTime().Date;
+
+            var isHistorical = historicalDate.HasValue && historicalDate.Value.Date < GetMexicoTime().Date;
+            var now = isHistorical ? referenceDate.AddDays(1).AddTicks(-1) : GetMexicoTime();
 
             var logs = session.Telemetry
-                .Where(t => t.CreatedAt >= startOfDay)
+                .Where(t => t.CreatedAt >= referenceDate && t.CreatedAt < referenceDate.AddDays(1))
                 .OrderBy(t => t.CreatedAt)
                 .ToList();
 
@@ -57,7 +88,17 @@ namespace MESAmetrics.Services
 
             var timeline = new List<TimelineSegmentDto>();
 
-            if (!logs.Any()) return new MachineMetricsDto();
+            if (!logs.Any())
+            {
+                return new MachineMetricsDto
+                {
+                    MachineName = session.Title,
+                    Shift = session.Shift?.ShiftName,
+                    Status = "offline",
+                    Availability = "0%",
+                    StatusDuration = "0m"
+                };
+            }
 
             bool isSegmentProducing = false;
             if (logs.Count > 1)
@@ -101,42 +142,45 @@ namespace MESAmetrics.Services
 
             var lastLog = logs.Last();
 
-            var now = GetMexicoTime();
-
-            var timeSinceLastSignal = Math.Max(0, (now - lastLog.CreatedAt!.Value).TotalSeconds);
-
-            string currentStatus = "detenido";
-            bool isLiveProducing = false;
-
-            if (timeSinceLastSignal > 60)
+            if (isHistorical)
             {
-                currentStatus = "detenido";
-                stopSeconds += timeSinceLastSignal;
-                if (wasProducing) stopCount++;
-
                 AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
-                AddSegment(timeline, "detenido", lastLog.CreatedAt!.Value, now);
             }
             else
             {
-                if (logs.Count >= 2)
+                var timeSinceLastSignal = Math.Max(0, (now - lastLog.CreatedAt!.Value).TotalSeconds);
+                string currentStatus = "detenido";
+                bool isLiveProducing = false;
+
+                if (timeSinceLastSignal > 60)
                 {
-                    var penultimate = logs[logs.Count - 2];
-                    isLiveProducing = lastLog.CycleCount > penultimate.CycleCount;
-                }
+                    currentStatus = "detenido";
+                    stopSeconds += timeSinceLastSignal;
+                    if (wasProducing) stopCount++;
 
-                currentStatus = isLiveProducing ? "produccion" : "detenido";
-
-                if (isLiveProducing) productionSeconds += timeSinceLastSignal;
-                else stopSeconds += timeSinceLastSignal;
-
-                if (isLiveProducing != isSegmentProducing)
-                {
                     AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
-                    currentSegmentStart = lastLog.CreatedAt!.Value;
+                    AddSegment(timeline, "detenido", lastLog.CreatedAt!.Value, now);
                 }
+                else
+                {
+                    if (logs.Count >= 2)
+                    {
+                        var penultimate = logs[logs.Count - 2];
+                        isLiveProducing = lastLog.CycleCount > penultimate.CycleCount;
+                    }
 
-                AddSegment(timeline, isLiveProducing ? "produccion" : "detenido", currentSegmentStart, now);
+                    currentStatus = isLiveProducing ? "produccion" : "detenido";
+
+                    if (isLiveProducing) productionSeconds += timeSinceLastSignal;
+                    else stopSeconds += timeSinceLastSignal;
+
+                    if (isLiveProducing != isSegmentProducing)
+                    {
+                        AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
+                        currentSegmentStart = lastLog.CreatedAt!.Value;
+                    }
+                    AddSegment(timeline, isLiveProducing ? "produccion" : "detenido", currentSegmentStart, now);
+                }
             }
 
             double totalTime = productionSeconds + stopSeconds;
@@ -145,11 +189,13 @@ namespace MESAmetrics.Services
             var lastSeg = timeline.LastOrDefault();
             string statusDurationStr = lastSeg != null ? lastSeg.Duration : "0m";
 
+            string finalStatus = isHistorical ? "offline" : (isSegmentProducing ? "produccion" : "detenido");
+
             return new MachineMetricsDto
             {
                 MachineName = session.Title,
                 Shift = session.Shift?.ShiftName ?? "N/A",
-                Status = currentStatus,
+                Status = finalStatus,
                 StatusDuration = statusDurationStr,
                 Availability = $"{availability:F1}%",
                 ProductionTime = FormatTime(TimeSpan.FromSeconds(productionSeconds)),
