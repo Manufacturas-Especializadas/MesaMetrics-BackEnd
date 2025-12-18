@@ -219,12 +219,24 @@ namespace MESAmetrics.Controllers
         {
             try
             {
-                if (request == null)
+                var exists = await _context.MachinesIds
+                            .AnyAsync(m => m.Machine == request.Machine);
+
+                if(exists)
                 {
                     return BadRequest(new
                     {
                         success = false,
-                        message = "No puede enviar datos nulos"
+                        message = "El id ya existe"
+                    });
+                }
+
+                if(request == null)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "No se puede enviar datos nulos"
                     });
                 }
 
