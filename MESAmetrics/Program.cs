@@ -22,14 +22,23 @@ var allowedConnection = builder.Configuration.GetValue<string>("OrigenesPermitid
         .Split(',')
         .Select(origin => origin.Trim())
         .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins(allowedConnection)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin => true);
+        }
+        else
+        {
+            policy.WithOrigins(allowedConnection);
+        }
+
+        policy.AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
