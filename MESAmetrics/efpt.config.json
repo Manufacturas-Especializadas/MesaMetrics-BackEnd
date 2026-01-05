@@ -36,6 +36,10 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[Roles]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[Shifts]",
          "ObjectType": 0
       },
@@ -45,6 +49,14 @@
       },
       {
          "Name": "[dbo].[Telemetry]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[UserRoles]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Users]",
          "ObjectType": 0
       }
    ],

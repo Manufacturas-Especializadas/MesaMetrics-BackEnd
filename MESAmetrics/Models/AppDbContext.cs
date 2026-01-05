@@ -21,11 +21,17 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<RealTimeTags> RealTimeTags { get; set; }
 
+    public virtual DbSet<Roles> Roles { get; set; }
+
     public virtual DbSet<Shifts> Shifts { get; set; }
 
     public virtual DbSet<Tags> Tags { get; set; }
 
     public virtual DbSet<Telemetry> Telemetry { get; set; }
+
+    public virtual DbSet<UserRoles> UserRoles { get; set; }
+
+    public virtual DbSet<Users> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,6 +150,23 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("FK__RealTimeT__tagId__151B244E");
         });
 
+        modelBuilder.Entity<Roles>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Roles__3214EC076D17B03E");
+
+            entity.HasIndex(e => e.RoleName, "UQ__Roles__B194786168EC2213").IsUnique();
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            entity.Property(e => e.RoleName)
+                .IsRequired()
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("roleName");
+        });
+
         modelBuilder.Entity<Shifts>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Shifts__3214EC07F7E42CEF");
@@ -195,6 +218,51 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.RealTimeId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK__Telemetry__creat__18EBB532");
+        });
+
+        modelBuilder.Entity<UserRoles>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.RoleId }).HasName("PK__UserRole__AF2760AD5DA78B57");
+
+            entity.Property(e => e.AssignedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("FK__UserRoles__RoleI__395884C4");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK__UserRoles__UserI__3864608B");
+        });
+
+        modelBuilder.Entity<Users>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Users__3214EC071AAD8A05");
+
+            entity.HasIndex(e => e.UserName, "UQ__Users__66DCF95C153E6808").IsUnique();
+
+            entity.Property(e => e.Active)
+                .HasDefaultValue(true)
+                .HasColumnName("active");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("createdAt");
+            entity.Property(e => e.Email)
+                .HasMaxLength(150)
+                .IsUnicode(false)
+                .HasColumnName("email");
+            entity.Property(e => e.PasswordHash)
+                .IsRequired()
+                .IsUnicode(false)
+                .HasColumnName("passwordHash");
+            entity.Property(e => e.UserName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("userName");
         });
 
         OnModelCreatingPartial(modelBuilder);
