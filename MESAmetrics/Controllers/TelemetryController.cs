@@ -93,10 +93,15 @@ namespace MESAmetrics.Controllers
             int detenido = 0;
             int alerta = 0;
             int sinDatos = 0;
+            var totalNames = new List<string>();
 
             foreach(var id in activeIds)
             {
                 var metrics = await _metricsService.CalculateMetricsAsync(id);
+
+                string machineName = metrics?.MachineName ?? $"Maquina ${id}";
+
+                totalNames.Add(machineName);
 
                 if(metrics != null)
                 {
@@ -132,7 +137,7 @@ namespace MESAmetrics.Controllers
                 Alerta = alerta,
                 SinDatos = sinDatos,
                 SinTurno = 0,
-                Total = activeIds.Count
+                Total = totalNames
             });
         }
 
