@@ -66,14 +66,13 @@ namespace MESAmetrics.Services
         public async Task<MachineMetricsDto> CalculateMetricsAsync(int realTimeId, DateTime? historicalDate = null)
         {
             var session = await _context.RealTime
-               .Include(rt => rt.Shift)
-               .Include(rt => rt.Telemetry)
-               .FirstOrDefaultAsync(rt => rt.Id == realTimeId);
+                .Include(rt => rt.Shift)
+                .Include(rt => rt.Telemetry)
+                .FirstOrDefaultAsync(rt => rt.Id == realTimeId);
 
             if (session == null) return null!;
 
             var referenceDate = historicalDate.HasValue ? historicalDate.Value.Date : GetMexicoTime().Date;
-
             var isHistorical = historicalDate.HasValue && historicalDate.Value.Date < GetMexicoTime().Date;
             var now = isHistorical ? referenceDate.AddDays(1).AddTicks(-1) : GetMexicoTime();
 
@@ -111,7 +110,6 @@ namespace MESAmetrics.Services
 
             var currentSegmentStart = logs[0].CreatedAt!.Value;
             bool wasProducing = false;
-
             for (int i = 0; i < logs.Count - 1; i++)
             {
                 var current = logs[i];
@@ -142,24 +140,27 @@ namespace MESAmetrics.Services
 
             var lastLog = logs.Last();
 
+            string finalStatusCalc = "detenido";
+
             if (isHistorical)
             {
                 AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
+                finalStatusCalc = "offline";
             }
             else
             {
                 var timeSinceLastSignal = Math.Max(0, (now - lastLog.CreatedAt!.Value).TotalSeconds);
-                string currentStatus = "detenido";
                 bool isLiveProducing = false;
 
                 if (timeSinceLastSignal > 60)
                 {
-                    currentStatus = "detenido";
                     stopSeconds += timeSinceLastSignal;
                     if (wasProducing) stopCount++;
 
                     AddSegment(timeline, isSegmentProducing ? "produccion" : "detenido", currentSegmentStart, lastLog.CreatedAt!.Value);
                     AddSegment(timeline, "detenido", lastLog.CreatedAt!.Value, now);
+
+                    finalStatusCalc = "detenido";
                 }
                 else
                 {
@@ -168,8 +169,6 @@ namespace MESAmetrics.Services
                         var penultimate = logs[logs.Count - 2];
                         isLiveProducing = lastLog.CycleCount > penultimate.CycleCount;
                     }
-
-                    currentStatus = isLiveProducing ? "produccion" : "detenido";
 
                     if (isLiveProducing) productionSeconds += timeSinceLastSignal;
                     else stopSeconds += timeSinceLastSignal;
@@ -180,6 +179,8 @@ namespace MESAmetrics.Services
                         currentSegmentStart = lastLog.CreatedAt!.Value;
                     }
                     AddSegment(timeline, isLiveProducing ? "produccion" : "detenido", currentSegmentStart, now);
+
+                    finalStatusCalc = isLiveProducing ? "produccion" : "detenido";
                 }
             }
 
@@ -189,13 +190,11 @@ namespace MESAmetrics.Services
             var lastSeg = timeline.LastOrDefault();
             string statusDurationStr = lastSeg != null ? lastSeg.Duration : "0m";
 
-            string finalStatus = isHistorical ? "offline" : (isSegmentProducing ? "produccion" : "detenido");
-
             return new MachineMetricsDto
             {
                 MachineName = session.Title,
                 Shift = session.Shift?.ShiftName ?? "N/A",
-                Status = finalStatus,
+                Status = finalStatusCalc,
                 StatusDuration = statusDurationStr,
                 Availability = $"{availability:F1}%",
                 ProductionTime = FormatTime(TimeSpan.FromSeconds(productionSeconds)),
