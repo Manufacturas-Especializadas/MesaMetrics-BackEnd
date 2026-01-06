@@ -84,49 +84,50 @@ namespace MESAmetrics.Controllers
         public async Task<IActionResult> GetDashboardStats()
         {
             var today = DateTime.Today;
-            var activeIds = await _context.RealTime
+
+            var activeMachines = await _context.RealTime
                     .Where(rt => rt.EndTime == null || rt.CreatedAt!.Value.Date == today)
-                    .Select(rt => rt.Id)
+                    .Select(rt => new { rt.Id, rt.Title })
                     .ToListAsync();
 
-            int produciendo = 0;
-            int detenido = 0;
-            int alerta = 0;
-            int sinDatos = 0;
+            var produciendo = new List<string>();
+            var detenido = new List<string>();
+            var alerta = new List<string>();
+            var sinDatos = new List<string>();
+            var sinTurno = new List<string>();
             var totalNames = new List<string>();
 
-            foreach(var id in activeIds)
+            foreach (var item in activeMachines)
             {
-                var metrics = await _metricsService.CalculateMetricsAsync(id);
+                string name = item.Title ?? $"Máquina {item.Id}";
+                totalNames.Add(name);
 
-                string machineName = metrics?.MachineName ?? $"Maquina ${id}";
+                var metrics = await _metricsService.CalculateMetricsAsync(item.Id);
 
-                totalNames.Add(machineName);
-
-                if(metrics != null)
+                if (metrics != null)
                 {
                     switch (metrics.Status?.ToLower())
                     {
                         case "produccion":
-                            produciendo++;
+                            produciendo.Add(name);
                             break;
 
                         case "detenido":
-                            detenido++; 
+                            detenido.Add(name);
                             break;
 
                         case "offline":
-                            sinDatos++; 
+                            sinDatos.Add(name);
                             break;
 
                         default:
-                            alerta++;
+                            alerta.Add(name);
                             break;
                     }
                 }
                 else
                 {
-                    sinDatos++;
+                    sinDatos.Add(name);
                 }
             }
 
@@ -136,7 +137,7 @@ namespace MESAmetrics.Controllers
                 Detenido = detenido,
                 Alerta = alerta,
                 SinDatos = sinDatos,
-                SinTurno = 0,
+                SinTurno = sinTurno,
                 Total = totalNames
             });
         }
