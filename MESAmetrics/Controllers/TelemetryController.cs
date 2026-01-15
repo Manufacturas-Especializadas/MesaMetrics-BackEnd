@@ -148,7 +148,7 @@ namespace MESAmetrics.Controllers
         {
             try
             {
-                string dbShiftName = shift.ToLower() == "morining" ? "Mañana" : "Noche";
+                string dbShiftName = shift.ToLower() == "morning" ? "Mañana" : "Noche";
 
                 var metricsList = await _metricsService.GetHistoricalMetricsAsync(date, dbShiftName);
 
