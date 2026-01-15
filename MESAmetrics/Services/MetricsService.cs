@@ -44,17 +44,19 @@ namespace MESAmetrics.Services
             var sessions = await _context.RealTime
                     .Include(rt => rt.Shift)
                     .Where(rt =>
-                        rt.CreatedAt.Value.Date == targetDate &&
+                        rt.CreatedAt!.Value.Date == targetDate &&
+                        rt.Shift != null &&
                         rt.Shift.ShiftName == shift
                     )
                     .ToListAsync();
 
             var result = new List<MachineMetricsDto>();
 
-            foreach(var session in sessions)
-            {
+            foreach (var session in sessions)
+            {               
                 var metrics = await CalculateMetricsAsync(session.Id, targetDate);
-                if(metrics != null)
+
+                if (metrics != null)
                 {
                     result.Add(metrics);
                 }
